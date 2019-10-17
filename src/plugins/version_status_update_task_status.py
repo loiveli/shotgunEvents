@@ -69,7 +69,7 @@ def version_status_changed(sg, logger, event, args):
     sg_version = sg.find_one(
         "Version",
         [["id", "is", entity_id]],
-        ["sg_task", "entity", "sg_status_list", "sg_task.Task.sg_status_list"]
+        ["sg_task", "entity", "sg_status_list", "sg_task.Task.sg_status_list", "sg_task.Task.downstream_tasks"]
     )
     if not sg_version:
         logger.info("Unable to retrieve Version (%d) %s from SG for event %d!" % (
@@ -84,7 +84,18 @@ def version_status_changed(sg, logger, event, args):
     
     if sg_version["sg_task"]:
         cur_task_status = sg_version["sg_task.Task.sg_status_list"]
-        
+        if cur_task_status =="apr":
+            upstream = sg.find("Task",[["upstream_tasks","is",sg_version["sg_task"]]],["code","sg_status_list"])
+            filter(lambda x:x["sg_status_list"] == "wtg",upstream )
+            logger.info(len(upstream))
+            for task in upstream:
+                batch_cmds.append({
+                "request_type": "update",
+                "entity_type": task["type"],
+                "entity_id": task["id"],
+                "data": {"sg_status_list": "rdy"}
+            })
+
         
         # Determine which, if any, status to set the linked Task to.
         
