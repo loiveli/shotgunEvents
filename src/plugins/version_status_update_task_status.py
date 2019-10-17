@@ -106,7 +106,7 @@ def version_status_changed(sg, logger, event, args):
                 ["sg_task_status_mapping", "code"]
             )
             new_task_status = None
-            if sg_status.get("sg_task_status_mapping") and cur_task_status != "out" :
+            if sg_status.get("sg_task_status_mapping") and cur_task_status not in ["out","apr"] :
                 new_task_status = sg_status.get("sg_task_status_mapping")
             logger.debug("Status [%s] Task Status mapping: %s %s" % (new_version_status, new_task_status,sg_status))
             logger.debug("Task current status: %s" % sg_version["sg_task.Task.sg_status_list"])
