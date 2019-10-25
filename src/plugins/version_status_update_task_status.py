@@ -1,11 +1,3 @@
-# Copyright 2018 Autodesk, Inc.  All rights reserved.
-#
-# Use of this software is subject to the terms of the Autodesk license agreement
-# provided at the time of installation or download, or which otherwise accompanies
-# this software in either electronic or hard copy form.
-#
-
-# See docs folder for detailed usage info.
 
 import os
 import pytz
@@ -44,7 +36,7 @@ def version_status_changed(sg, logger, event, args):
     First, check the new Version status for an sg_task_status_mapping
     Status value to set the linked Task to. Second, update the
     Version.sg_date_approved value when a Version's status is set to
-    the approved status.
+    the approved status. Then update all waiting downstream tasks to ready to go
 
     :param sg: Shotgun API instance
     :param logger: Standard Event loop logger
@@ -80,21 +72,11 @@ def version_status_changed(sg, logger, event, args):
     new_version_status = sg_version["sg_status_list"]
     batch_cmds = []
 
-    # if we have a linked Task, check to see if we can update its status
     
+    #If the version has a linked task, and the version was approved check all the upstream tasks
     if sg_version["sg_task"]:
         cur_task_status = sg_version["sg_task.Task.sg_status_list"]
-        if cur_task_status =="apr":
-            upstream = sg.find("Task",[["upstream_tasks","is",sg_version["sg_task"]]],["code","sg_status_list"])
-            filter(lambda x:x["sg_status_list"] == "wtg",upstream )
-            logger.info(len(upstream))
-            for task in upstream:
-                batch_cmds.append({
-                "request_type": "update",
-                "entity_type": task["type"],
-                "entity_id": task["id"],
-                "data": {"sg_status_list": "rdy"}
-            })
+        
 
         
         # Determine which, if any, status to set the linked Task to.
@@ -106,9 +88,10 @@ def version_status_changed(sg, logger, event, args):
                 ["sg_task_status_mapping", "code"]
             )
             new_task_status = None
-            if sg_status.get("sg_task_status_mapping") and cur_task_status not in ["out","apr"] :
+            #Check that the current status is not XDEV, Approved Or Submitted, otherwise get the mapping code
+            if sg_status.get("sg_task_status_mapping") and cur_task_status not in ["out","apr","sbm"] :
                 new_task_status = sg_status.get("sg_task_status_mapping")
-            logger.debug("Status [%s] Task Status mapping: %s %s" % (new_version_status, new_task_status,sg_status))
+            logger.debug("Status [%s] Task Status mapping: %s" % (new_version_status, new_task_status))
             logger.debug("Task current status: %s" % sg_version["sg_task.Task.sg_status_list"])
 
             if new_task_status and new_task_status != cur_task_status:
@@ -125,6 +108,19 @@ def version_status_changed(sg, logger, event, args):
                     logger.info("Cannot update Version [%d] Task status." % entity_id)
                     new_task_status = None
                 logger.debug("New Task status: %s" % new_task_status)
+        if cur_task_status =="apr":
+            upstream = sg.find("Task",[["upstream_tasks","is",sg_version["sg_task"]]],["code","sg_status_list"])
+            filter(lambda x:x["sg_status_list"] == "wtg",upstream )
+            #Filter to only get Waiting tasks
+            logger.debug("%i Upstream tasks" % len(upstream))
+            for task in upstream:
+                #Change all Waiting upstream tasks to Ready To Go
+                batch_cmds.append({
+                "request_type": "update",
+                "entity_type": task["type"],
+                "entity_id": task["id"],
+                "data": {"sg_status_list": "rdy"}
+            })
 
         logger.debug("Version Task: %s" % sg_version["sg_task"])
         if new_task_status and new_task_status != cur_task_status:
