@@ -6,3 +6,4 @@ shotgunEventDaemon.conf
 *.id
 *.pid
 log
+src/plugins
