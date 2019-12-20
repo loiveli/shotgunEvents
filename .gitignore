@@ -7,3 +7,5 @@ shotgunEventDaemon.conf
 *.pid
 log
 src/plugins
+dockerfile
+requirements.txt
